@@ -1,0 +1,126 @@
+import * as c from "/custom_scripts/functions/constants.script";
+
+export async function get_server_info(serv) {
+    if (ns.serverExists(serv) == true) {
+        var accServ = ns.scan(serv, hostnames = true);
+        var ram = ns.getServerRam(serv);
+        var root = ns.hasRootAccess(serv);
+        var ports = ns.getServerNumPortsRequired(serv);
+        var reqHackLvl = ns.getServerRequiredHackingLevel(serv);
+        var monAvail = ns.getServerMoneyAvailable(serv);
+        var monMax = ns.getServerMaxMoney(serv);
+        var secLvl = ns.getServerSecurityLevel(serv);
+        return [accServ,
+            ram,
+            root,
+            ports,
+            reqHackLvl,
+            monAvail,
+            monMax,
+            secLvl];
+    } else {
+        print("This is not a server.");
+        return 0;
+    }
+
+}
+
+export async function open_ports(serv, root) {
+    var num_ports = ns.getServerNumPortsRequired(serv);
+    switch (num_ports) {
+        case 0:
+            if (root == false) {
+                ns.nuke(serv);
+            } else {
+                ns.print("Server already has root access.");
+            }
+            break;
+        case 1:
+            ns.brutessh(serv);
+            ns.nuke(serv);
+            break;
+        case 2:
+            ns.ftpcrack(serv);
+            ns.brutessh(serv);
+            ns.nuke(serv);
+            break;
+        case 3:
+            ns.relaysmtp(serv);
+            ns.ftpcrack(serv);
+            ns.brutessh(serv);
+            ns.nuke(serv);
+            break;
+        case 4:
+            ns.httpworm(serv);
+            ns.relaysmtp(serv);
+            ns.ftpcrack(serv);
+            ns.brutessh(serv);
+            ns.nuke(serv);
+            break;
+        case 5:
+            ns.sqlinject(serv);
+            ns.httpworm(serv);
+            ns.relaysmtp(serv);
+            ns.ftpcrack(serv);
+            ns.brutessh(serv);
+            ns.nuke(serv);
+            break;
+    }
+    return true;
+}
+
+export async function send_file(file_name, serv) {
+    if (ns.fileExists(file_name, serv) == true) {
+        ns.rm(file_name);
+        await ns.scp(file_name, serv);
+    } else {
+        await ns.scp(file_name, serv);
+    }
+}
+
+export async function current_max_ports() {
+    var maxPorts = 0;
+    var exes = c.get_executables();
+    for (var i = 0; i < exes.length; i++) {
+        if (ns.fileExists(exes[i], "home") == true) {
+            maxPorts++;
+        }
+    }
+    return (maxPorts - 1);
+}
+
+export async function get_most_profit_server() {
+    var servs = get_accessible_servers();
+    var curHackLvl = ns.getHackingLevel();
+    var curMaxHack = 0;
+    var curMaxMon = 0;
+    var maxPorts = current_max_ports();
+    var maxServ = "";
+    tprint("servs: " + servs);
+    tprint("curHackLvl: " + curHackLvl);
+    for (var i = 0; i < servs.length; i++) {
+        var servInfo = get_server_info(servs[i]);
+        if ((servInfo[4] <= curHackLvl) &&
+            (servInfo[4] >= curMaxHack) &&
+            (servInfo[6] >= curMaxMon) &&
+            (servInfo[3] <= maxPorts)) {
+            maxServ = servs[i];
+            curMaxHack = servInfo[4];
+            curMaxMon = servInfo[6];
+        }
+    }
+    return maxServ;
+}
+
+export async function get_accessible_servers() {
+    var servs = c.get_server_list();
+    var maxPorts = current_max_ports();
+    var accessServs = [];
+    for (var i = 0; i < servs.length; i++) {
+        var servInfo = get_server_info(servs[i]);
+        if (maxPorts >= servInfo[3]) {
+            accessServs.push(servs[i]);
+        }
+    }
+    return accessServs;
+}
