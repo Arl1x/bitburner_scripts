@@ -1,0 +1,72 @@
+import * as funcs from "/custom_scripts/functions/my_functions.ns";
+import * as c from "/custom_scripts/functions/constants.script";
+
+/**
+* @param {NS} ns
+**/
+
+export async function main(ns) {
+    var script_to_kill = "/custom_scripts/early-hack-template.script";
+    var script_to_run = "/custom_scripts/mid-hack-template.script";
+    var scripts = [script_to_run,
+        "/custom_scripts/functions/my_functions.script",
+        "/custom_scripts/functions/constants.script"
+    ];
+
+    // Get the target server to hack against.
+    var target = funcs.get_most_profit_server();
+    // Calculate how many threads we can afford to run on home 
+    if (ns.scriptRunning(script_to_kill, "home") == true) {
+        ns.scriptKill(script_to_kill, "home");
+    }
+    if (ns.scriptRunning(script_to_run, "home") == true) {
+        ns.scriptKill(script_to_run, "home");
+    }
+    ns.print("Script killed.");
+    var sRAM = ns.getScriptRam(script_to_run);
+    var totalRam = ns.getServerMaxRam("home");
+    var ramUsed = ns.getServerUsedRam("home");
+    var availRam = totalRam - ramUsed;
+    var threads = availRam / sRAM;
+    ns.tprint(script_to_run);
+    ns.tprint("sRAM: " + sRAM);
+    ns.tprint("totalRam: " + totalRam);
+    ns.tprint("ramUsed: " + ramUsed);
+    ns.tprint("availRam: " + availRam);
+    ns.tprint("threads: " + threads);
+    ns.tprint(Math.floor(threads) - 5);
+    ns.tprint(target);
+    ns.exec(script_to_run, "home", Math.floor(threads) - 5, target);
+    ns.print("Script executed.");
+
+    // Get list of servers we can access and run the script on.
+    var servList = await funcs.get_accessible_servers();
+    ns.print("Server list retrieved.");
+
+    // Break open servers and run script.
+    for (var i = 0; i < servList.length; ++i) {
+        var serv = servList[i];
+        if (ns.scriptRunning(script_to_kill, serv) == true) {
+            ns.scriptKill(script_to_kill, serv);
+            ns.print("Script killed.");
+        }
+        if (ns.scriptRunning(script_to_run, serv) == true) {
+            ns.scriptKill(script_to_run, serv);
+            ns.print("Script killed.");
+        }
+        var info = funcs.get_server_info(serv);
+        if (info[1][0] == 0) {
+            ns.print("Server doesn't have any RAM. Skipping this server.");
+            break;
+        }
+        var root = info[2];
+        var aRAM = info[1][0] - info[1][1];
+        var threads = aRAM / sRAM;
+        await funcs.open_ports(serv, root);
+        await ns.scp(scripts, serv);
+        ns.print("Scripts copied over.");
+        ns.exec(script_to_run, serv, Math.floor(threads), target);
+        ns.print("Script executed.");
+    }
+    ns.print("Upgrade Complete.");
+}
